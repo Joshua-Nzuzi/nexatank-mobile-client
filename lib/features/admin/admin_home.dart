@@ -39,7 +39,6 @@ class _AdminHomeState extends State<AdminHome> {
   Future<void> _fetchAdminData() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
-    
     try {
       final response = await _apiService.getTanks();
       if (response['success'] == true && response['tanks'] != null) {
@@ -84,6 +83,144 @@ class _AdminHomeState extends State<AdminHome> {
     setState(() => _alertCount = count);
   }
 
+  void _showMeasurementsList() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildGlassModal(
+        context,
+        heightFactor: 0.75,
+        child: Column(
+          children: [
+            const Text("HISTORIQUE DES MESURES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+            const Divider(color: Colors.white10, height: 30),
+            Expanded(
+              child: _recentMeasures.isEmpty 
+                ? const Center(child: Text("Aucune donnée", style: TextStyle(color: Colors.white24)))
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: _recentMeasures.length,
+                    itemBuilder: (context, index) {
+                      final m = _recentMeasures[index];
+                      return _buildMeasureCard(m);
+                    },
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCalculateDialog() {
+    dynamic selectedTankId;
+    final depthController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => _buildGlassModal(
+          context,
+          heightFactor: 0.6,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Calcul Rapide Gérant", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 25),
+                DropdownButtonFormField<dynamic>(
+                  dropdownColor: const Color(0xFF1A237E),
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _inputDecoration("Choisir la cuve", Icons.gas_meter),
+                  items: _tanks.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['name'] ?? "Inconnu", style: const TextStyle(color: Colors.white)))).toList(),
+                  onChanged: (v) => setModalState(() => selectedTankId = v),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: depthController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                  decoration: _inputDecoration("Profondeur (cm)", Icons.straighten),
+                ),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                  onPressed: selectedTankId == null ? null : () async {
+                    await _apiService.calculateVolume(selectedTankId, double.parse(depthController.text));
+                    await _fetchAdminData();
+                    Navigator.pop(context);
+                  },
+                  child: const Text("CALCULER", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlassModal(BuildContext context, {required double heightFactor, required Widget child}) {
+    return Container(
+      height: MediaQuery.of(context).size.height * heightFactor,
+      margin: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: const BoxDecoration(color: Color(0xFF1A237E), borderRadius: BorderRadius.vertical(top: Radius.circular(35))),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
+              const SizedBox(height: 20),
+              Expanded(child: child),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMeasureCard(dynamic m) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white10)),
+      child: Row(
+        children: [
+          const Icon(Icons.history_edu_rounded, color: Colors.blueAccent, size: 22),
+          const SizedBox(width: 15),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("${m['tank']} • par ${m['user']}", style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Row(children: [
+                Text("${m['depth']} cm", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Icon(Icons.arrow_right_alt, color: Colors.white24)),
+                Text("${m['volume']} L", style: const TextStyle(color: Colors.greenAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+              ]),
+            ],
+          )),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label, labelStyle: const TextStyle(color: Colors.white70),
+      prefixIcon: Icon(icon, color: Colors.white70),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.white24)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.blueAccent)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     double totalEssence = 0;
@@ -94,7 +231,6 @@ class _AdminHomeState extends State<AdminHome> {
       else if (t['type'] == 'Gazole') totalGazole += vol;
     }
     double totalVolume = totalEssence + totalGazole;
-    
     final double screenWidth = MediaQuery.of(context).size.width;
     final int crossAxisCount = screenWidth > 900 ? 4 : (screenWidth > 600 ? 3 : 2);
 
@@ -102,15 +238,8 @@ class _AdminHomeState extends State<AdminHome> {
       allowedRoles: const ['admin', 'superAdmin'],
       child: Scaffold(
         body: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1A237E), Color(0xFF121212)],
-            ),
-          ),
+          width: double.infinity, height: double.infinity,
+          decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF1A237E), Color(0xFF121212)])),
           child: SafeArea(
             child: _isLoading 
             ? const Center(child: CircularProgressIndicator(color: Colors.white))
@@ -118,33 +247,31 @@ class _AdminHomeState extends State<AdminHome> {
                 onRefresh: _fetchAdminData,
                 child: CustomScrollView(
                   slivers: [
-                    // Header Gérant
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15),
+                        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('NexaTank', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0)),
+                                const Text('NexaTank', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0)),
                                 Text('Gérant: ${_adminName ?? "---"}', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6), fontWeight: FontWeight.bold)),
                               ],
                             ),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white24), color: Colors.white.withOpacity(0.05)),
-                              child: const Text('N', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
-                            ),
+                            Row(children: [
+                              IconButton(icon: const Icon(Icons.history_edu_rounded, color: Colors.blueAccent), onPressed: _showMeasurementsList),
+                              IconButton(icon: const Icon(Icons.logout, color: Colors.redAccent, size: 20), onPressed: () async {
+                                await _storageService.clearSession();
+                                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LandingPage()), (route) => false);
+                              }),
+                            ]),
                           ],
                         ),
                       ),
                     ),
-
                     const SliverToBoxAdapter(child: Divider(color: Colors.white10, height: 1)),
-
-                    // Stat Cards Glass
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.all(20),
@@ -157,8 +284,6 @@ class _AdminHomeState extends State<AdminHome> {
                         ),
                       ),
                     ),
-
-                    // Répartition Carburant Glass
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -181,95 +306,32 @@ class _AdminHomeState extends State<AdminHome> {
                         ),
                       ),
                     ),
-
-                    // Historique Horizontal
-                    if (_recentMeasures.isNotEmpty) ...[
-                      const SliverToBoxAdapter(
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(20, 30, 20, 10),
-                          child: Text("Dernières Mesures", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                        ),
-                      ),
-                      SliverToBoxAdapter(
-                        child: SizedBox(
-                          height: 110,
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _recentMeasures.length,
-                            itemBuilder: (context, index) {
-                              final m = _recentMeasures[index];
-                              return Container(
-                                width: 180,
-                                margin: const EdgeInsets.only(right: 12),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(m['tank'] ?? "---", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                                    Text("${m['volume'] ?? 0} L", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-                                    Text("par ${m['user'] ?? '---'}", style: const TextStyle(fontSize: 10, color: Colors.white38)),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-
-                    // Grille des Cuves
                     SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(20, 30, 20, 10),
-                        child: Text("État des Cuves", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text("État des Cuves", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                            IconButton(icon: const Icon(Icons.calculate_rounded, color: Colors.blueAccent), onPressed: _showCalculateDialog),
+                          ],
+                        ),
                       ),
                     ),
-
                     SliverPadding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          childAspectRatio: 0.72,
-                          crossAxisSpacing: 15,
-                          mainAxisSpacing: 15,
-                        ),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: crossAxisCount, childAspectRatio: 0.72, crossAxisSpacing: 15, mainAxisSpacing: 15),
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
                             final tank = _tanks[index];
-                            return TankWidget(
-                              name: tank['name'] ?? 'Inconnu',
-                              capacity: (tank['capacity'] as num?)?.toDouble() ?? 0.0,
-                              type: tank['type'] ?? 'Essence',
-                              currentVolume: (tank['current_volume'] as num?)?.toDouble() ?? 0.0,
-                            );
+                            return TankWidget(name: tank['name'] ?? '---', capacity: (tank['capacity'] as num?)?.toDouble() ?? 0.0, type: tank['type'] ?? 'Essence', currentVolume: (tank['current_volume'] as num?)?.toDouble() ?? 0.0);
                           },
                           childCount: _tanks.length,
                         ),
                       ),
                     ),
-
-                    // Footer Signature
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 40),
-                        child: Column(
-                          children: [
-                            TextButton(
-                              onPressed: () async {
-                                await _storageService.clearSession();
-                                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LandingPage()), (route) => false);
-                              },
-                              child: Text("Déconnexion", style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12)),
-                            ),
-                            const Text('powered by JoshuaDev', style: TextStyle(fontSize: 10, color: Colors.white24)),
-                          ],
-                        ),
-                      ),
-                    ),
+                    const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: Text('powered by JoshuaDev', style: TextStyle(fontSize: 10, color: Colors.white24))))),
                   ],
                 ),
               ),
@@ -283,39 +345,23 @@ class _AdminHomeState extends State<AdminHome> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white10)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 12),
-          Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-          Text(title, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.w500)),
-        ],
-      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(icon, color: color, size: 24),
+        const SizedBox(height: 12),
+        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+        Text(title, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.5), fontWeight: FontWeight.w500)),
+      ]),
     );
   }
 
   Widget _buildStockIndicator(String label, double volume, Color color, double total) {
     double percent = total > 0 ? (volume / total).clamp(0.0, 1.0) : 0.0;
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white.withOpacity(0.7), letterSpacing: 1)),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: LinearProgressIndicator(
-              value: percent, 
-              backgroundColor: Colors.white.withOpacity(0.05),
-              color: color,
-              minHeight: 6,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text("${volume.toInt()} L", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
-        ],
-      ),
-    );
+    return Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white.withOpacity(0.7), letterSpacing: 1)),
+      const SizedBox(height: 6),
+      ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: percent, backgroundColor: Colors.white.withOpacity(0.05), color: color, minHeight: 6)),
+      const SizedBox(height: 6),
+      Text("${volume.toInt()} L", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+    ]));
   }
 }

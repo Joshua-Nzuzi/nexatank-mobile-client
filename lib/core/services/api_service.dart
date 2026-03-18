@@ -62,16 +62,31 @@ class ApiService {
     }
   }
 
-  // ----------------- ENDPOINTS -----------------
+  Future<Map<String, dynamic>> _delete(String endpoint) async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.delete(Uri.parse('${ApiConfig.baseUrl}$endpoint'), headers: headers).timeout(const Duration(seconds: 15));
+      return _handleResponse(response);
+    } catch (e) {
+      return {'success': false, 'message': 'Erreur: $e'};
+    }
+  }
+
+  // ----------------- ENDPOINTS AUTH -----------------
 
   Future<Map<String, dynamic>> register(String name, String role, String phone) async {
     return _post('/api/auth/users', {'name': name, 'role': role, 'phone': phone});
   }
 
-  // MODIFIÉ : LOGIN AVEC CODE UNIQUEMENT
   Future<Map<String, dynamic>> loginWithCode(int code) async {
     return _post('/api/auth/login', {'code': code.toString()});
   }
+
+  Future<Map<String, dynamic>> regenerateCode(String phone) async {
+    return _patch('/api/auth/users', {'phone': phone});
+  }
+
+  // ----------------- ENDPOINTS TANKS -----------------
 
   Future<Map<String, dynamic>> getTanks() async {
     return _get('/api/tanks');
@@ -81,7 +96,23 @@ class ApiService {
     return _post('/api/tanks/volume', {'tank_id': tankId, 'depth_cm': depthCm});
   }
 
-  Future<Map<String, dynamic>> regenerateCode(String phone) async {
-    return _patch('/api/auth/users', {'phone': phone});
+  // ----------------- ENDPOINTS MEASUREMENTS -----------------
+
+  Future<Map<String, dynamic>> getAllMeasurements() async {
+    return _get('/api/measurements');
+  }
+
+  // ----------------- ENDPOINTS USERS (ADMIN) -----------------
+
+  Future<Map<String, dynamic>> getUsers() async {
+    return _get('/api/users');
+  }
+
+  Future<Map<String, dynamic>> deleteUser(int userId) async {
+    return _delete('/api/users/$userId');
+  }
+
+  Future<Map<String, dynamic>> updateUserStatus(int userId, bool isRestricted) async {
+    return _patch('/api/users/$userId/status', {'restricted': isRestricted});
   }
 }

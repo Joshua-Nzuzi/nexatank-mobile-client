@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import '../../core/services/api_service.dart';
 import '../../core/services/storage_service.dart';
+import '../admin/SuperAdminHome.dart';
 import '../admin/admin_home.dart';
 import '../operator/operator_home.dart';
 import 'screens/register_page.dart';
@@ -48,10 +49,13 @@ class _LoginPageState extends State<LoginPage> {
         name: user['name']
       );
 
-      if (user['role'] == 'user') {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OperatorHome()));
+      // REDIRECTION SELON LE RÔLE (Joshua inclus)
+      if (user['role'] == 'superAdmin') {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SuperAdminHome()));
       } else if (user['role'] == 'admin') {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminHome()));
+      } else {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const OperatorHome()));
       }
     } else {
       _showSnackBar(response['message'] ?? 'Code incorrect');
