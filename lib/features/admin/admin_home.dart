@@ -90,21 +90,19 @@ class _AdminHomeState extends State<AdminHome> {
       backgroundColor: Colors.transparent,
       builder: (context) => _buildGlassModal(
         context,
-        heightFactor: 0.75,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             const Text("HISTORIQUE DES MESURES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
             const Divider(color: Colors.white10, height: 30),
-            Expanded(
+            Flexible(
               child: _recentMeasures.isEmpty 
-                ? const Center(child: Text("Aucune donnée", style: TextStyle(color: Colors.white24)))
+                ? const Padding(padding: EdgeInsets.all(20), child: Text("Aucune donnée", style: TextStyle(color: Colors.white24)))
                 : ListView.builder(
+                    shrinkWrap: true,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     itemCount: _recentMeasures.length,
-                    itemBuilder: (context, index) {
-                      final m = _recentMeasures[index];
-                      return _buildMeasureCard(m);
-                    },
+                    itemBuilder: (context, index) => _buildMeasureCard(_recentMeasures[index]),
                   ),
             ),
           ],
@@ -118,45 +116,47 @@ class _AdminHomeState extends State<AdminHome> {
     final depthController = TextEditingController();
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => _buildGlassModal(
           context,
-          heightFactor: 0.6,
-          child: Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("Calcul Rapide Gérant", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 25),
-                DropdownButtonFormField<dynamic>(
-                  dropdownColor: const Color(0xFF1A237E),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: _inputDecoration("Choisir la cuve", Icons.gas_meter),
-                  items: _tanks.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['name'] ?? "Inconnu", style: const TextStyle(color: Colors.white)))).toList(),
-                  onChanged: (v) => setModalState(() => selectedTankId = v),
-                ),
-                const SizedBox(height: 15),
-                TextField(
-                  controller: depthController,
-                  style: const TextStyle(color: Colors.white),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                  decoration: _inputDecoration("Profondeur (cm)", Icons.straighten),
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                  onPressed: selectedTankId == null ? null : () async {
-                    await _apiService.calculateVolume(selectedTankId, double.parse(depthController.text));
-                    await _fetchAdminData();
-                    Navigator.pop(context);
-                  },
-                  child: const Text("CALCULER", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                ),
-              ],
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("Calcul Rapide Gérant", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 25),
+                  DropdownButtonFormField<dynamic>(
+                    dropdownColor: const Color(0xFF1A237E),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _inputDecoration("Choisir la cuve", Icons.gas_meter),
+                    items: _tanks.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['name'] ?? "---", style: const TextStyle(color: Colors.white)))).toList(),
+                    onChanged: (v) => setModalState(() => selectedTankId = v),
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: depthController,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                    decoration: _inputDecoration("Profondeur (cm)", Icons.straighten),
+                  ),
+                  const SizedBox(height: 30),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                    onPressed: selectedTankId == null ? null : () async {
+                      await _apiService.calculateVolume(selectedTankId, double.parse(depthController.text));
+                      await _fetchAdminData();
+                      Navigator.pop(context);
+                    },
+                    child: const Text("CALCULER", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
         ),
@@ -164,22 +164,30 @@ class _AdminHomeState extends State<AdminHome> {
     );
   }
 
-  Widget _buildGlassModal(BuildContext context, {required double heightFactor, required Widget child}) {
-    return Container(
-      height: MediaQuery.of(context).size.height * heightFactor,
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: const BoxDecoration(color: Color(0xFF1A237E), borderRadius: BorderRadius.vertical(top: Radius.circular(35))),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
-              const SizedBox(height: 20),
-              Expanded(child: child),
-            ],
+  Widget _buildGlassModal(BuildContext context, {required Widget child}) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        margin: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A237E).withOpacity(0.95),
+          borderRadius: BorderRadius.circular(35),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(35),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
+                const SizedBox(height: 20),
+                child,
+              ],
+            ),
           ),
         ),
       ),
@@ -331,7 +339,7 @@ class _AdminHomeState extends State<AdminHome> {
                         ),
                       ),
                     ),
-                    const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.symmetric(vertical: 40), child: Center(child: Text('powered by JoshuaDev', style: TextStyle(fontSize: 10, color: Colors.white24))))),
+                    SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.symmetric(vertical: 40), child: Center(child: Text('powered by JoshuaDev', style: TextStyle(fontSize: 10, color: Colors.white24))))),
                   ],
                 ),
               ),
