@@ -3,7 +3,7 @@ import 'features/shared/screens/landing_page.dart';
 import 'features/auth/screens/register_page.dart';
 import 'features/auth/login_page.dart';
 import 'features/admin/admin_home.dart';
-import 'features/operator/operator_home.dart';
+import 'features/operator/operator_home_clean.dart';
 import 'core/services/storage_service.dart';
 
 void main() async {
@@ -37,17 +37,17 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        // Harmonisation avec le style "Deep Energy"
+        // Nouvelle Palette Obsidian Teal
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A237E),
-          primary: const Color(0xFF1A237E),
-          secondary: Colors.blueAccent,
-          brightness: Brightness.light,
+          seedColor: const Color(0xFF00BFA5),
+          primary: const Color(0xFF00BFA5),
+          secondary: const Color(0xFF00897B),
+          surface: const Color(0xFF121212),
+          brightness: Brightness.dark,
         ),
-        // Style des boutons par défaut pour toute l'app
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1A237E),
+            backgroundColor: const Color(0xFF00BFA5),
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),

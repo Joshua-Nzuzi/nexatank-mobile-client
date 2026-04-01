@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'package:nexatank/core/services/api_service.dart';
+import 'package:nexatank/core/services/storage_service.dart';
 import 'package:nexatank/features/shared/screens/landing_page.dart';
 import 'package:nexatank/features/shared/widgets/tank_widget.dart';
-import '../../../core/services/storage_service.dart';
+import 'package:nexatank/features/shared/widgets/measure_feedback.dart';
+import 'package:nexatank/features/shared/widgets/app_feedback.dart';
 import '../shared/widgets/protected_page.dart';
 
 class OperatorHome extends StatefulWidget {
@@ -23,6 +25,10 @@ class _OperatorHomeState extends State<OperatorHome> {
   bool _isLoading = true;
   String? _userName;
 
+  final Color _primaryDark = const Color(0xFF002B26);
+  final Color _accentTeal = const Color(0xFF00BFA5);
+  final Color _darkBg = const Color(0xFF121212);
+
   @override
   void initState() {
     super.initState();
@@ -31,21 +37,28 @@ class _OperatorHomeState extends State<OperatorHome> {
 
   Future<void> _loadInitialData() async {
     final name = await _storageService.getUserName();
-    setState(() => _userName = name);
+    if (mounted) setState(() => _userName = name);
     _fetchTanks();
   }
 
   Future<void> _fetchTanks() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    final response = await _apiService.getTanks();
-    if (response['success'] == true && response['tanks'] != null) {
-      setState(() {
-        _tanks = response['tanks'];
-        _recentMeasures = response['recentMeasures'] ?? [];
+    try {
+      final response = await _apiService.getTanks();
+      if (response['success'] == true && response['tanks'] != null) {
+        if (mounted) {
+          setState(() {
+            _tanks = response['tanks'];
+            _recentMeasures = response['recentMeasures'] ?? [];
+            _isLoading = false;
+          });
+        }
+      } else {
         _isLoading = false;
-      });
-    } else {
-      _isLoading = false;
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -56,16 +69,15 @@ class _OperatorHomeState extends State<OperatorHome> {
       backgroundColor: Colors.transparent,
       builder: (context) => _buildGlassModal(
         context,
+        heightFactor: 0.75,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             const Text("HISTORIQUE TECHNIQUE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 16)),
             const Divider(color: Colors.white10, height: 30),
-            Flexible(
+            Expanded(
               child: _recentMeasures.isEmpty 
-                ? const Padding(padding: EdgeInsets.all(20), child: Text("Aucune donnée", style: TextStyle(color: Colors.white24)))
+                ? const Center(child: Text("Aucune donnée", style: TextStyle(color: Colors.white24)))
                 : ListView.builder(
-                    shrinkWrap: true,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     itemCount: _recentMeasures.length,
                     itemBuilder: (context, index) => _buildMeasureCard(_recentMeasures[index]),
@@ -80,6 +92,8 @@ class _OperatorHomeState extends State<OperatorHome> {
   void _showGetVolumeDialog() {
     dynamic selectedTankId;
     final depthController = TextEditingController();
+    bool isProcessing = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -87,44 +101,68 @@ class _OperatorHomeState extends State<OperatorHome> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => _buildGlassModal(
           context,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text("Nouvelle Mesure", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 25),
-                  DropdownButtonFormField<dynamic>(
-                    dropdownColor: const Color(0xFF1A237E),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _inputDecoration("Choisir la cuve", Icons.gas_meter),
-                    items: _tanks.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['name'], style: const TextStyle(color: Colors.white)))).toList(),
-                    onChanged: (val) => setModalState(() => selectedTankId = val),
-                  ),
-                  const SizedBox(height: 15),
-                  TextField(
-                    controller: depthController,
-                    style: const TextStyle(color: Colors.white),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                    decoration: _inputDecoration("Profondeur (cm)", Icons.straighten),
-                  ),
-                  const SizedBox(height: 30),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                    onPressed: selectedTankId == null ? null : () async {
-                      final res = await _apiService.calculateVolume(selectedTankId, double.parse(depthController.text));
-                      if (res['success']) {
-                        await _fetchTanks();
-                        Navigator.pop(context);
+          heightFactor: 0.6,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Nouvelle Mesure", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 25),
+                DropdownButtonFormField<dynamic>(
+                  dropdownColor: _primaryDark,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _inputDecoration("Choisir la cuve", Icons.gas_meter),
+                  items: _tanks.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['name'] ?? "Inconnu", style: const TextStyle(color: Colors.white)))).toList(),
+                  onChanged: (val) => setModalState(() => selectedTankId = val),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: depthController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                  decoration: _inputDecoration("Profondeur (cm)", Icons.straighten),
+                ),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: _accentTeal, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                  onPressed: (selectedTankId == null || isProcessing) ? null : () async {
+                    if (depthController.text.isEmpty) return;
+                    setModalState(() => isProcessing = true);
+                    final depth = double.tryParse(depthController.text);
+                    final tankName = _tanks.firstWhere((t) => t['id'] == selectedTankId, orElse: () => {'name': '---'})['name'];
+                    
+                    if (depth != null) {
+                      try {
+                        final res = await _apiService.calculateVolume(selectedTankId, depth);
+                        if (!mounted) return;
+                        if (res['success']) {
+                          await _fetchTanks();
+                        }
+                        await showMeasureResult(
+                          context, 
+                          success: res['success'] == true, 
+                          message: res['message'] ?? (res['success'] == true ? 'Mesure effectuée' : 'Erreur lors du calcul'),
+                          summary: {
+                            'tank': tankName,
+                            'depth': depth,
+                            'volume': res['volume'] ?? res['data']?['volume'] ?? '--'
+                          }
+                        );
+                        if (res['success'] == true) Navigator.pop(context);
+                      } catch (e) {
+                        setModalState(() => isProcessing = false);
                       }
-                    },
-                    child: const Text("VALIDER LA MESURE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
+                    }
+                    setModalState(() => isProcessing = false);
+                  },
+                  child: isProcessing 
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                    : const Text("VALIDER LA MESURE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+                const SizedBox(height: 20),
+              ],
             ),
           ),
         ),
@@ -132,28 +170,23 @@ class _OperatorHomeState extends State<OperatorHome> {
     );
   }
 
-  Widget _buildGlassModal(BuildContext context, {required Widget child}) {
+  Widget _buildGlassModal(BuildContext context, {required double heightFactor, required Widget child}) {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
-        margin: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A237E).withOpacity(0.95),
-          borderRadius: BorderRadius.circular(35),
-          border: Border.all(color: Colors.white10),
-        ),
+        height: MediaQuery.of(context).size.height * heightFactor,
+        margin: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(color: _primaryDark.withOpacity(0.95), borderRadius: const BorderRadius.vertical(top: Radius.circular(35))),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(35),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 12),
                 Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
                 const SizedBox(height: 20),
-                child,
+                Expanded(child: child),
               ],
             ),
           ),
@@ -169,7 +202,7 @@ class _OperatorHomeState extends State<OperatorHome> {
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white10)),
       child: Row(
         children: [
-          const Icon(Icons.history_edu_rounded, color: Colors.blueAccent, size: 22),
+          Icon(Icons.history_edu_rounded, color: _accentTeal, size: 22),
           const SizedBox(width: 15),
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,7 +226,7 @@ class _OperatorHomeState extends State<OperatorHome> {
       labelText: label, labelStyle: const TextStyle(color: Colors.white70),
       prefixIcon: Icon(icon, color: Colors.white70),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.white24)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.blueAccent)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: _accentTeal)),
     );
   }
 
@@ -209,7 +242,7 @@ class _OperatorHomeState extends State<OperatorHome> {
       child: Scaffold(
         body: Container(
           width: double.infinity, height: double.infinity,
-          decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF1A237E), Color(0xFF121212)])),
+          decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_primaryDark, _darkBg])),
           child: SafeArea(
             child: _isLoading ? const Center(child: CircularProgressIndicator(color: Colors.white)) : Column(
               children: [
@@ -220,13 +253,16 @@ class _OperatorHomeState extends State<OperatorHome> {
                     children: [
                       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         const Text('NexaTank', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-                        if (_userName != null) Text('Pompiste: $_userName', style: const TextStyle(fontSize: 11, color: Colors.white38, fontWeight: FontWeight.bold)),
+                        Text('Pompiste: ${_userName ?? "---"}', style: const TextStyle(fontSize: 11, color: Colors.white38, fontWeight: FontWeight.bold)),
                       ]),
                       Row(children: [
-                        IconButton(icon: const Icon(Icons.history_edu_rounded, color: Colors.blueAccent), onPressed: _showMeasurementsList),
+                        IconButton(icon: Icon(Icons.history_edu_rounded, color: _accentTeal), onPressed: _showMeasurementsList),
                         IconButton(icon: const Icon(Icons.logout, color: Colors.redAccent, size: 20), onPressed: () async {
-                          await _storageService.clearSession();
-                          Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LandingPage()), (route) => false);
+                          final bool confirmed = await confirmLogoutDialog(context);
+                          if (confirmed) {
+                            await _storageService.clearSession();
+                            if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LandingPage()), (route) => false);
+                          }
                         }),
                       ]),
                     ],
@@ -255,7 +291,7 @@ class _OperatorHomeState extends State<OperatorHome> {
                 Padding(
                   padding: const EdgeInsets.all(20),
                   child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                    style: ElevatedButton.styleFrom(backgroundColor: _accentTeal, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
                     onPressed: _showGetVolumeDialog,
                     icon: const Icon(Icons.add_chart_rounded, color: Colors.white),
                     label: const Text("NOUVELLE MESURE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),

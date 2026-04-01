@@ -16,7 +16,7 @@ class LandingPage extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A237E), Color(0xFF121212)],
+            colors: [Color(0xFF002B26), Color(0xFF121212)], // ✅ teal au lieu de bleu
           ),
         ),
         child: Stack(
@@ -25,9 +25,16 @@ class LandingPage extends StatelessWidget {
             Positioned(
               bottom: -100,
               right: -50,
-              child: Container(width: 300, height: 300, decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), shape: BoxShape.circle)),
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  color: Color(0xFF00BFA5).withOpacity(0.1), // ✅ teal
+                  shape: BoxShape.circle,
+                ),
+              ),
             ),
-            
+
             SafeArea(
               child: Center(
                 child: Padding(
@@ -47,22 +54,35 @@ class LandingPage extends StatelessWidget {
                             color: Colors.white.withOpacity(0.05),
                           ),
                           child: const Center(
-                            child: Text('N', style: TextStyle(fontSize: 50, color: Colors.white, fontWeight: FontWeight.w900)),
+                            child: Text('N',
+                                style: TextStyle(
+                                    fontSize: 50,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900)),
                           ),
                         ),
                       ),
                       const SizedBox(height: 24),
+
                       // Texte hiérarchisé
                       Text.rich(
                         TextSpan(
                           children: [
                             TextSpan(
                               text: 'Bienvenu sur\n',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w300, color: Colors.white70, letterSpacing: 1),
+                              style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w300,
+                                  color: Colors.white70,
+                                  letterSpacing: 1),
                             ),
                             TextSpan(
                               text: 'NexaTank',
-                              style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 2),
+                              style: TextStyle(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: 2),
                             ),
                           ],
                         ),
@@ -70,7 +90,10 @@ class LandingPage extends StatelessWidget {
                       ),
                       const Text(
                         'la Jauge intelligente',
-                        style: TextStyle(fontSize: 16, color: Colors.white70, letterSpacing: 1.2),
+                        style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white70,
+                            letterSpacing: 1.2),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 80),
@@ -94,12 +117,22 @@ class LandingPage extends StatelessWidget {
                                   height: 55,
                                   child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.blueAccent,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                      backgroundColor: Color(0xFF00BFA5), // ✅ teal
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                          BorderRadius.circular(15)),
                                       elevation: 0,
                                     ),
-                                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginPage())),
-                                    child: const Text('SE CONNECTER', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.white)),
+                                    onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                            const LoginPage())),
+                                    child: const Text('SE CONNECTER',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1,
+                                            color: Colors.white)),
                                   ),
                                 ),
                                 const SizedBox(height: 15),
@@ -108,11 +141,21 @@ class LandingPage extends StatelessWidget {
                                   height: 55,
                                   child: OutlinedButton(
                                     style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: Colors.white24),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                                      side: const BorderSide(
+                                          color: Colors.white24),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                          BorderRadius.circular(15)),
                                     ),
-                                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPage())),
-                                    child: const Text('CRÉER UN COMPTE', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
+                                    onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) =>
+                                            const RegisterPage())),
+                                    child: const Text('CRÉER UN COMPTE',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white70)),
                                   ),
                                 ),
                               ],
@@ -124,7 +167,10 @@ class LandingPage extends StatelessWidget {
                       const SizedBox(height: 60),
                       const Text(
                         'powered by JoshuaDev',
-                        style: TextStyle(fontSize: 11, color: Colors.white24, letterSpacing: 0.5),
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.white24,
+                            letterSpacing: 0.5),
                       ),
                     ],
                   ),

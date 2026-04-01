@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nexatank/features/admin/SuperAdminHome.dart';
 import 'package:nexatank/features/admin/admin_home.dart';
-import 'package:nexatank/features/operator/operator_home.dart';
+import 'package:nexatank/features/operator/operator_home_clean.dart';
 import 'package:nexatank/features/shared/screens/landing_page.dart';
 import '../../../core/services/storage_service.dart';
 

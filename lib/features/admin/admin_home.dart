@@ -5,6 +5,8 @@ import 'package:nexatank/core/services/api_service.dart';
 import 'package:nexatank/core/services/storage_service.dart';
 import 'package:nexatank/features/shared/screens/landing_page.dart';
 import 'package:nexatank/features/shared/widgets/tank_widget.dart';
+import 'package:nexatank/features/shared/widgets/measure_feedback.dart';
+import 'package:nexatank/features/shared/widgets/app_feedback.dart';
 import 'package:nexatank/features/shared/widgets/protected_page.dart';
 
 class AdminHome extends StatefulWidget {
@@ -24,6 +26,11 @@ class _AdminHomeState extends State<AdminHome> {
   String? _adminName;
   int _alertCount = 0;
 
+  // Palette Obsidian Teal
+  final Color _primaryDark = const Color(0xFF002B26);
+  final Color _accentTeal = const Color(0xFF00BFA5);
+  final Color _darkBg = const Color(0xFF121212);
+
   @override
   void initState() {
     super.initState();
@@ -33,9 +40,10 @@ class _AdminHomeState extends State<AdminHome> {
   Future<void> _loadInitialData() async {
     final name = await _storageService.getUserName();
     if (mounted) setState(() => _adminName = name);
+    WidgetsBinding.instance.addPostFrameCallback((_) => showWelcomeSnackBar(context, name));
     _fetchAdminData();
   }
-
+  
   Future<void> _fetchAdminData() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
@@ -90,16 +98,15 @@ class _AdminHomeState extends State<AdminHome> {
       backgroundColor: Colors.transparent,
       builder: (context) => _buildGlassModal(
         context,
+        heightFactor: 0.75,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             const Text("HISTORIQUE DES MESURES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
             const Divider(color: Colors.white10, height: 30),
-            Flexible(
+            Expanded(
               child: _recentMeasures.isEmpty 
-                ? const Padding(padding: EdgeInsets.all(20), child: Text("Aucune donnée", style: TextStyle(color: Colors.white24)))
+                ? const Center(child: Text("Aucune donnée", style: TextStyle(color: Colors.white24)))
                 : ListView.builder(
-                    shrinkWrap: true,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     itemCount: _recentMeasures.length,
                     itemBuilder: (context, index) => _buildMeasureCard(_recentMeasures[index]),
@@ -114,49 +121,91 @@ class _AdminHomeState extends State<AdminHome> {
   void _showCalculateDialog() {
     dynamic selectedTankId;
     final depthController = TextEditingController();
+    bool isProcessing = false;
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => _buildGlassModal(
           context,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text("Calcul Rapide Gérant", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 25),
-                  DropdownButtonFormField<dynamic>(
-                    dropdownColor: const Color(0xFF1A237E),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: _inputDecoration("Choisir la cuve", Icons.gas_meter),
-                    items: _tanks.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['name'] ?? "---", style: const TextStyle(color: Colors.white)))).toList(),
-                    onChanged: (v) => setModalState(() => selectedTankId = v),
-                  ),
-                  const SizedBox(height: 15),
-                  TextField(
-                    controller: depthController,
-                    style: const TextStyle(color: Colors.white),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                    decoration: _inputDecoration("Profondeur (cm)", Icons.straighten),
-                  ),
-                  const SizedBox(height: 30),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                    onPressed: selectedTankId == null ? null : () async {
-                      await _apiService.calculateVolume(selectedTankId, double.parse(depthController.text));
-                      await _fetchAdminData();
-                      Navigator.pop(context);
-                    },
-                    child: const Text("CALCULER", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
-                  const SizedBox(height: 20),
-                ],
-              ),
+          heightFactor: 0.6,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Calcul Rapide Gérant", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 25),
+                DropdownButtonFormField<dynamic>(
+                  dropdownColor: _primaryDark,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: _inputDecoration("Choisir la cuve", Icons.gas_meter),
+                  items: _tanks.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['name'] ?? "Inconnu", style: const TextStyle(color: Colors.white)))).toList(),
+                  onChanged: (v) => setModalState(() => selectedTankId = v),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: depthController,
+                  style: const TextStyle(color: Colors.white),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                  decoration: _inputDecoration("Profondeur (cm)", Icons.straighten),
+                ),
+                const SizedBox(height: 18),
+                StatefulBuilder(builder: (context2, setLocal) {
+                  return SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: _accentTeal, minimumSize: const Size(double.infinity, 55), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
+                      onPressed: (selectedTankId == null || isProcessing) ? null : () async {
+                        final depthStr = depthController.text.trim();
+                        final tankName = _tanks.firstWhere((t) => t['id'] == selectedTankId, orElse: () => {'name': '---'})['name'];
+                        
+                        if (depthStr.isEmpty) {
+                          await showMeasureResult(context, success: false, message: 'Veuillez entrer la profondeur.', summary: {'tank': tankName});
+                          return;
+                        }
+                        final depth = double.tryParse(depthStr);
+                        if (depth == null) {
+                          await showMeasureResult(context, success: false, message: 'Profondeur invalide.', summary: {'tank': tankName});
+                          return;
+                        }
+
+                        setLocal(() => isProcessing = true);
+                        try {
+                          final res = await _apiService.calculateVolume(selectedTankId, depth);
+                          if (!mounted) return;
+                          if (res['success']) {
+                            await _fetchAdminData();
+                          }
+                          await showMeasureResult(
+                            context, 
+                            success: res['success'] == true, 
+                            message: res['message'] ?? (res['success'] == true ? 'Mesure effectuée' : 'Erreur lors du calcul'),
+                            summary: {
+                              'tank': tankName,
+                              'depth': depth,
+                              'volume': res['volume'] ?? res['data']?['volume'] ?? '--'
+                            }
+                          );
+                          if (res['success'] == true) Navigator.pop(context);
+                        } catch (e) {
+                          showNetworkError(context);
+                        } finally {
+                          setLocal(() => isProcessing = false);
+                        }
+                      },
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: isProcessing
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Text("CALCULER", key: ValueKey('calc_text'), style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
           ),
         ),
@@ -164,28 +213,23 @@ class _AdminHomeState extends State<AdminHome> {
     );
   }
 
-  Widget _buildGlassModal(BuildContext context, {required Widget child}) {
+  Widget _buildGlassModal(BuildContext context, {required double heightFactor, required Widget child}) {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
-        margin: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A237E).withOpacity(0.95),
-          borderRadius: BorderRadius.circular(35),
-          border: Border.all(color: Colors.white10),
-        ),
+        height: MediaQuery.of(context).size.height * heightFactor,
+        margin: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(color: _primaryDark.withOpacity(0.95), borderRadius: BorderRadius.vertical(top: Radius.circular(35))),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(35),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(35)),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 12),
                 Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10))),
                 const SizedBox(height: 20),
-                child,
+                Expanded(child: child),
               ],
             ),
           ),
@@ -201,7 +245,7 @@ class _AdminHomeState extends State<AdminHome> {
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white10)),
       child: Row(
         children: [
-          const Icon(Icons.history_edu_rounded, color: Colors.blueAccent, size: 22),
+          Icon(Icons.history_edu_rounded, color: _accentTeal, size: 22),
           const SizedBox(width: 15),
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,7 +269,7 @@ class _AdminHomeState extends State<AdminHome> {
       labelText: label, labelStyle: const TextStyle(color: Colors.white70),
       prefixIcon: Icon(icon, color: Colors.white70),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.white24)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.blueAccent)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: _accentTeal)),
     );
   }
 
@@ -247,7 +291,7 @@ class _AdminHomeState extends State<AdminHome> {
       child: Scaffold(
         body: Container(
           width: double.infinity, height: double.infinity,
-          decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF1A237E), Color(0xFF121212)])),
+          decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [_primaryDark, _darkBg])),
           child: SafeArea(
             child: _isLoading 
             ? const Center(child: CircularProgressIndicator(color: Colors.white))
@@ -265,14 +309,18 @@ class _AdminHomeState extends State<AdminHome> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text('NexaTank', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0)),
-                                Text('Gérant: ${_adminName ?? "---"}', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6), fontWeight: FontWeight.bold)),
+                                Text('Gérant: ${_adminName ?? "---"}', style: TextStyle(fontSize: 12, color: Colors.white38, fontWeight: FontWeight.bold)),
                               ],
                             ),
                             Row(children: [
-                              IconButton(icon: const Icon(Icons.history_edu_rounded, color: Colors.blueAccent), onPressed: _showMeasurementsList),
+                              IconButton(icon: Icon(Icons.history_edu_rounded, color: _accentTeal), onPressed: _showMeasurementsList),
                               IconButton(icon: const Icon(Icons.logout, color: Colors.redAccent, size: 20), onPressed: () async {
-                                await _storageService.clearSession();
-                                Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LandingPage()), (route) => false);
+                                // AJOUT DE LA CONFIRMATION POUR LE GÉRANT
+                                final bool confirmed = await confirmLogoutDialog(context);
+                                if (confirmed) {
+                                  await _storageService.clearSession();
+                                  if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LandingPage()), (route) => false);
+                                }
                               }),
                             ]),
                           ],
@@ -285,7 +333,7 @@ class _AdminHomeState extends State<AdminHome> {
                         padding: const EdgeInsets.all(20),
                         child: Row(
                           children: [
-                            Expanded(child: _buildStatCard("Volume Global", "${totalVolume.toInt()} L", Icons.analytics_rounded, Colors.blueAccent)),
+                            Expanded(child: _buildStatCard("Volume Global", "${totalVolume.toInt()} L", Icons.analytics_rounded, _accentTeal)),
                             const SizedBox(width: 15),
                             Expanded(child: _buildStatCard("Alertes", "$_alertCount", Icons.warning_rounded, _alertCount > 0 ? Colors.redAccent : Colors.greenAccent)),
                           ],
@@ -321,7 +369,7 @@ class _AdminHomeState extends State<AdminHome> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text("État des Cuves", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-                            IconButton(icon: const Icon(Icons.calculate_rounded, color: Colors.blueAccent), onPressed: _showCalculateDialog),
+                            IconButton(icon: Icon(Icons.calculate_rounded, color: _accentTeal), onPressed: _showCalculateDialog),
                           ],
                         ),
                       ),
