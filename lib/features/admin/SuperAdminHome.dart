@@ -23,6 +23,8 @@ class _SuperAdminHomeState extends State<SuperAdminHome> {
   List<dynamic> _tanks = [];
   List<dynamic> _recentMeasures = [];
   bool _isLoading = true;
+  bool _isMaintenanceActive = false;
+  String _currentMaintenanceMessage = "";
   String? _adminName;
 
   // Palette Obsidian Teal
@@ -40,21 +42,99 @@ class _SuperAdminHomeState extends State<SuperAdminHome> {
     final name = await _storageService.getUserName();
     if (mounted) setState(() => _adminName = name);
     _fetchTanks();
+    _fetchSystemStatus();
   }
 
   Future<void> _fetchTanks() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
-    final response = await _apiService.getTanks();
-    if (mounted) {
+    try {
+      final response = await _apiService.getTanks();
+      if (mounted) {
+        setState(() {
+          if (response['success'] == true) {
+            _tanks = response['tanks'] ?? [];
+            _recentMeasures = response['recentMeasures'] ?? [];
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _fetchSystemStatus() async {
+    final res = await _apiService.getSystemStatus();
+    if (res['success'] == true) {
       setState(() {
-        if (response['success'] == true) {
-          _tanks = response['tanks'] ?? [];
-          _recentMeasures = response['recentMeasures'] ?? [];
-        }
-        _isLoading = false;
+        _isMaintenanceActive = res['settings']['maintenance_mode'] == 'true';
+        _currentMaintenanceMessage = res['settings']['maintenance_message'] ?? "";
       });
     }
+  }
+
+  void _toggleMaintenance(bool value) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _primaryDark,
+        title: Text(value ? "VERROUILLER LE SYSTÈME ?" : "DÉVERROUILLER ?", style: const TextStyle(color: Colors.white)),
+        content: Text(
+          value 
+            ? "Tous les utilisateurs (Pompistes et Gérants) seront immédiatement déconnectés ou bloqués."
+            : "L'accès au service sera rétabli pour tout le monde.",
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("ANNULER", style: TextStyle(color: Colors.white38))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: value ? Colors.redAccent : _accentTeal),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(value ? "VERROUILLER" : "ACTIVER", style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final res = await _apiService.toggleMaintenance(value);
+      if (res['success']) {
+        setState(() => _isMaintenanceActive = value);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['message'])));
+      }
+    }
+  }
+
+  void _editMaintenanceMessage() {
+    final controller = TextEditingController(text: _currentMaintenanceMessage);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _primaryDark,
+        title: const Text("Message de Maintenance", style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          style: const TextStyle(color: Colors.white),
+          decoration: _inputDecoration("Votre message", Icons.edit_note),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("ANNULER", style: TextStyle(color: Colors.white38))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: _accentTeal),
+            onPressed: () async {
+              final res = await _apiService.updateMaintenanceMessage(controller.text);
+              if (res['success']) {
+                setState(() => _currentMaintenanceMessage = controller.text);
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text("ENREGISTRER"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showUsersDialog() async {
@@ -242,6 +322,15 @@ class _SuperAdminHomeState extends State<SuperAdminHome> {
   }
 
   Widget _buildMeasureCard(dynamic m) {
+    String timeStr = "---";
+    if (m['date'] != null) {
+      try {
+        // CORRECTION TIMEZONE : On parse et on ajoute +1 heure manuellement
+        final DateTime date = DateTime.parse(m['date']).add(const Duration(hours: 1));
+        timeStr = "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+      } catch (_) {}
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
@@ -253,7 +342,13 @@ class _SuperAdminHomeState extends State<SuperAdminHome> {
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("${m['tank']} • par ${m['user']}", style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("${m['tank']} • par ${m['user']}", style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+                  Text(timeStr, style: TextStyle(color: _accentTeal.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
               const SizedBox(height: 4),
               Row(children: [
                 Text("${m['depth']} cm", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -314,7 +409,6 @@ class _SuperAdminHomeState extends State<SuperAdminHome> {
                         Text('SuperAdmin: ${_adminName ?? "Joshua"} 👑', style: TextStyle(fontSize: 11, color: _accentTeal.withOpacity(0.8), fontWeight: FontWeight.bold)),
                       ]),
                       IconButton(icon: const Icon(Icons.logout, color: Colors.redAccent, size: 20), onPressed: () async {
-                        // CONFIRMATION LOGOUT POUR JOSHUA
                         final bool confirmed = await confirmLogoutDialog(context);
                         if (confirmed) {
                           await _storageService.clearSession();
@@ -324,8 +418,58 @@ class _SuperAdminHomeState extends State<SuperAdminHome> {
                     ],
                   ),
                 ),
+
+                // BARRE DE CONTRÔLE SYSTÈME (NOUVEAU)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(15),
+                        decoration: BoxDecoration(
+                          color: _isMaintenanceActive ? Colors.redAccent.withOpacity(0.1) : _accentTeal.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: _isMaintenanceActive ? Colors.redAccent.withOpacity(0.3) : _accentTeal.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(_isMaintenanceActive ? Icons.lock_person_rounded : Icons.lock_open_rounded, color: _isMaintenanceActive ? Colors.redAccent : _accentTeal),
+                            const SizedBox(width: 15),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _isMaintenanceActive ? "SYSTÈME VERROUILLÉ" : "SYSTÈME OUVERT",
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                  ),
+                                  Text(
+                                    _isMaintenanceActive ? "Maintenance active" : "Opérations normales",
+                                    style: TextStyle(color: Colors.white38, fontSize: 10),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _isMaintenanceActive,
+                              activeColor: Colors.redAccent,
+                              onChanged: _toggleMaintenance,
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.edit_note_rounded, color: Colors.white38),
+                              onPressed: _editMaintenanceMessage,
+                            )
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   child: Row(children: [
                     _buildActionButton("COMPTES", Icons.people_alt_rounded, _showUsersDialog),
                     const SizedBox(width: 10),
@@ -334,7 +478,8 @@ class _SuperAdminHomeState extends State<SuperAdminHome> {
                     _buildActionButton("CALCUL", Icons.calculate_rounded, _showCalculateDialog),
                   ]),
                 ),
-                const SizedBox(height: 20),
+                
+                const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Container(

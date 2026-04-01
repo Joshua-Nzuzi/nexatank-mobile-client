@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:nexatank/core/services/storage_service.dart';
+import 'package:nexatank/core/services/api_service.dart';
 import 'package:nexatank/features/admin/SuperAdminHome.dart';
 import 'package:nexatank/features/admin/admin_home.dart';
 import 'package:nexatank/features/operator/operator_home.dart';
 import 'package:nexatank/features/shared/screens/landing_page.dart';
+import 'package:nexatank/features/shared/screens/maintenance_page.dart';
 
 class ProtectedPage extends StatefulWidget {
   final List<String> allowedRoles;
@@ -22,12 +25,25 @@ class ProtectedPage extends StatefulWidget {
 class _ProtectedPageState extends State<ProtectedPage> {
   late Future<String?> _roleFuture;
   final StorageService _storageService = StorageService();
+  StreamSubscription? _maintenanceSubscription;
 
   @override
   void initState() {
     super.initState();
-    // On ne lance le futur qu'une seule fois !
     _roleFuture = _storageService.getUserRole();
+    
+    // ÉCOUTE DU MODE MAINTENANCE
+    _maintenanceSubscription = ApiService.maintenanceStream.listen((message) {
+      if (mounted) {
+        _redirect(MaintenancePage(message: message));
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _maintenanceSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -37,7 +53,8 @@ class _ProtectedPageState extends State<ProtectedPage> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            backgroundColor: Color(0xFF121212),
+            body: Center(child: CircularProgressIndicator(color: Color(0xFF00BFA5))),
           );
         }
 
@@ -45,14 +62,14 @@ class _ProtectedPageState extends State<ProtectedPage> {
 
         if (snapshot.hasError || userRole == null) {
           _redirect(const LandingPage());
-          return const Scaffold(body: SizedBox.shrink());
+          return const Scaffold(backgroundColor: Color(0xFF121212), body: SizedBox.shrink());
         }
 
         if (widget.allowedRoles.contains(userRole)) {
           return widget.child;
         } else {
           _redirectToCorrectHome(userRole);
-          return const Scaffold(body: SizedBox.shrink());
+          return const Scaffold(backgroundColor: Color(0xFF121212), body: SizedBox.shrink());
         }
       },
     );

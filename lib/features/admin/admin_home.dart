@@ -26,7 +26,6 @@ class _AdminHomeState extends State<AdminHome> {
   String? _adminName;
   int _alertCount = 0;
 
-  // Palette Obsidian Teal
   final Color _primaryDark = const Color(0xFF002B26);
   final Color _accentTeal = const Color(0xFF00BFA5);
   final Color _darkBg = const Color(0xFF121212);
@@ -161,7 +160,6 @@ class _AdminHomeState extends State<AdminHome> {
                       onPressed: (selectedTankId == null || isProcessing) ? null : () async {
                         final depthStr = depthController.text.trim();
                         final tankName = _tanks.firstWhere((t) => t['id'] == selectedTankId, orElse: () => {'name': '---'})['name'];
-                        
                         if (depthStr.isEmpty) {
                           await showMeasureResult(context, success: false, message: 'Veuillez entrer la profondeur.', summary: {'tank': tankName});
                           return;
@@ -171,7 +169,6 @@ class _AdminHomeState extends State<AdminHome> {
                           await showMeasureResult(context, success: false, message: 'Profondeur invalide.', summary: {'tank': tankName});
                           return;
                         }
-
                         setLocal(() => isProcessing = true);
                         try {
                           final res = await _apiService.calculateVolume(selectedTankId, depth);
@@ -239,6 +236,15 @@ class _AdminHomeState extends State<AdminHome> {
   }
 
   Widget _buildMeasureCard(dynamic m) {
+    String timeStr = "---";
+    if (m['date'] != null) {
+      try {
+        // FORCE HEURE KINSHASA (GMT+1)
+        final DateTime date = DateTime.parse(m['date']).toUtc().add(const Duration(hours: 1));
+        timeStr = "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+      } catch (_) {}
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
@@ -250,7 +256,13 @@ class _AdminHomeState extends State<AdminHome> {
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("${m['tank']} • par ${m['user']}", style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("${m['tank']} • par ${m['user']}", style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+                  Text(timeStr, style: TextStyle(color: _accentTeal.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
               const SizedBox(height: 4),
               Row(children: [
                 Text("${m['depth']} cm", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -309,13 +321,12 @@ class _AdminHomeState extends State<AdminHome> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text('NexaTank', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.0)),
-                                Text('Gérant: ${_adminName ?? "---"}', style: TextStyle(fontSize: 12, color: Colors.white38, fontWeight: FontWeight.bold)),
+                                Text('Gérant: ${_adminName ?? "---"}', style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.6), fontWeight: FontWeight.bold)),
                               ],
                             ),
                             Row(children: [
                               IconButton(icon: Icon(Icons.history_edu_rounded, color: _accentTeal), onPressed: _showMeasurementsList),
                               IconButton(icon: const Icon(Icons.logout, color: Colors.redAccent, size: 20), onPressed: () async {
-                                // AJOUT DE LA CONFIRMATION POUR LE GÉRANT
                                 final bool confirmed = await confirmLogoutDialog(context);
                                 if (confirmed) {
                                   await _storageService.clearSession();

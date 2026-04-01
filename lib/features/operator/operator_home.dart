@@ -196,6 +196,15 @@ class _OperatorHomeState extends State<OperatorHome> {
   }
 
   Widget _buildMeasureCard(dynamic m) {
+    String timeStr = "---";
+    if (m['date'] != null) {
+      try {
+        // FORCE HEURE KINSHASA (UTC+1)
+        final DateTime date = DateTime.parse(m['date']).toUtc().add(const Duration(hours: 1));
+        timeStr = "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+      } catch (_) {}
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
@@ -207,7 +216,13 @@ class _OperatorHomeState extends State<OperatorHome> {
           Expanded(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("${m['tank']} • par ${m['user']}", style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("${m['tank']} • par ${m['user']}", style: const TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
+                  Text(timeStr, style: TextStyle(color: _accentTeal.withOpacity(0.8), fontSize: 10, fontWeight: FontWeight.bold)),
+                ],
+              ),
               const SizedBox(height: 4),
               Row(children: [
                 Text("${m['depth']} cm", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),

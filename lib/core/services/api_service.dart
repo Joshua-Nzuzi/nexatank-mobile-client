@@ -7,6 +7,10 @@ import 'dart:async';
 class ApiService {
   final StorageService _storageService = StorageService();
 
+  // Stream pour notifier l'app du mode maintenance
+  static final _maintenanceController = StreamController<String>.broadcast();
+  static Stream<String> get maintenanceStream => _maintenanceController.stream;
+
   Future<Map<String, String>> _getHeaders() async {
     final token = await _storageService.getAuthToken();
     final headers = {
@@ -22,6 +26,13 @@ class ApiService {
   Map<String, dynamic> _handleResponse(http.Response response) {
     try {
       final responseBody = jsonDecode(response.body);
+      
+      // DÉTECTION DU MODE MAINTENANCE (CODE 503)
+      if (response.statusCode == 503 && responseBody['maintenance'] == true) {
+        _maintenanceController.add(responseBody['message'] ?? 'Maintenance en cours');
+        return {'success': false, 'maintenance': true, 'message': responseBody['message']};
+      }
+
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return responseBody;
       } else {
@@ -73,7 +84,6 @@ class ApiService {
   }
 
   // ----------------- ENDPOINTS AUTH -----------------
-
   Future<Map<String, dynamic>> register(String name, String role, String phone) async {
     return _post('/api/auth/users', {'name': name, 'role': role, 'phone': phone});
   }
@@ -87,7 +97,6 @@ class ApiService {
   }
 
   // ----------------- ENDPOINTS TANKS -----------------
-
   Future<Map<String, dynamic>> getTanks() async {
     return _get('/api/tanks');
   }
@@ -97,13 +106,11 @@ class ApiService {
   }
 
   // ----------------- ENDPOINTS MEASUREMENTS -----------------
-
   Future<Map<String, dynamic>> getAllMeasurements() async {
     return _get('/api/measurements');
   }
 
   // ----------------- ENDPOINTS USERS (ADMIN) -----------------
-
   Future<Map<String, dynamic>> getUsers() async {
     return _get('/api/users');
   }
@@ -112,7 +119,16 @@ class ApiService {
     return _delete('/api/users/$userId');
   }
 
-  Future<Map<String, dynamic>> updateUserStatus(int userId, bool isRestricted) async {
-    return _patch('/api/users/$userId/status', {'restricted': isRestricted});
+  // ----------------- ENDPOINTS SYSTEM (JOSHUA) -----------------
+  Future<Map<String, dynamic>> getSystemStatus() async {
+    return _get('/api/system/status');
+  }
+
+  Future<Map<String, dynamic>> toggleMaintenance(bool active) async {
+    return _post('/api/system/toggle', {'mode': active.toString()});
+  }
+
+  Future<Map<String, dynamic>> updateMaintenanceMessage(String message) async {
+    return _post('/api/system/message', {'message': message});
   }
 }
